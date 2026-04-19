@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: prompts
+    description: Prompt operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,86 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /prompts:
+    get:
+      operationId: listPrompts
+      tags: [prompts]
+      summary: List all prompts
+      description: Returns all prompts ordered by creation date descending
+      responses:
+        "200":
+          description: List of prompts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PromptSummary"
+    post:
+      operationId: createPrompt
+      tags: [prompts]
+      summary: Create a new prompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePromptBody"
+      responses:
+        "201":
+          description: Created prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /prompts/{id}:
+    get:
+      operationId: getPrompt
+      tags: [prompts]
+      summary: Get a single prompt
+      description: Returns a single prompt and increments its view count
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Prompt with view count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptDetail"
+        "404":
+          description: Prompt not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /prompts/stats:
+    get:
+      operationId: getPromptsStats
+      tags: [prompts]
+      summary: Get library stats
+      description: Returns aggregate stats for the prompt library
+      responses:
+        "200":
+          description: Stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptsStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +116,121 @@ components:
       required:
         - status
 
+    PromptSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        complexity:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - complexity
+        - createdAt
+
+    Prompt:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        complexity:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - content
+        - complexity
+        - createdAt
+
+    PromptDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        complexity:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        viewCount:
+          type: integer
+      required:
+        - id
+        - title
+        - content
+        - complexity
+        - createdAt
+        - viewCount
+
+    CreatePromptBody:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+        content:
+          type: string
+          minLength: 20
+        complexity:
+          type: integer
+          minimum: 1
+          maximum: 10
+      required:
+        - title
+        - content
+        - complexity
+
+    PromptsStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        avgComplexity:
+          type: number
+        complexityBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComplexityCount"
+        recentCount:
+          type: integer
+      required:
+        - total
+        - avgComplexity
+        - complexityBreakdown
+        - recentCount
+
+    ComplexityCount:
+      type: object
+      properties:
+        level:
+          type: string
+        count:
+          type: integer
+      required:
+        - level
+        - count
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

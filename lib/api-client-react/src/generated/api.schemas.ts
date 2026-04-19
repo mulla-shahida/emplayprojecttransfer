@@ -8,3 +8,55 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface PromptSummary {
+  id: number;
+  title: string;
+  complexity: number;
+  createdAt: string;
+}
+
+export interface Prompt {
+  id: number;
+  title: string;
+  content: string;
+  complexity: number;
+  createdAt: string;
+}
+
+export interface PromptDetail {
+  id: number;
+  title: string;
+  content: string;
+  complexity: number;
+  createdAt: string;
+  viewCount: number;
+}
+
+export interface CreatePromptBody {
+  /** @minLength 3 */
+  title: string;
+  /** @minLength 20 */
+  content: string;
+  /**
+   * @minimum 1
+   * @maximum 10
+   */
+  complexity: number;
+}
+
+export interface ComplexityCount {
+  level: string;
+  count: number;
+}
+
+export interface PromptsStats {
+  total: number;
+  avgComplexity: number;
+  complexityBreakdown: ComplexityCount[];
+  recentCount: number;
+}
+
+export interface ErrorResponse {
+  error: string;
+}

@@ -5,18 +5,29 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  CreatePromptBody,
+  ErrorResponse,
+  HealthStatus,
+  Prompt,
+  PromptDetail,
+  PromptSummary,
+  PromptsStats,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -92,6 +103,330 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns all prompts ordered by creation date descending
+ * @summary List all prompts
+ */
+export const getListPromptsUrl = () => {
+  return `/api/prompts`;
+};
+
+export const listPrompts = async (
+  options?: RequestInit,
+): Promise<PromptSummary[]> => {
+  return customFetch<PromptSummary[]>(getListPromptsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPromptsQueryKey = () => {
+  return [`/api/prompts`] as const;
+};
+
+export const getListPromptsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPrompts>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPrompts>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListPromptsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPrompts>>> = ({
+    signal,
+  }) => listPrompts({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPrompts>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPromptsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPrompts>>
+>;
+export type ListPromptsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all prompts
+ */
+
+export function useListPrompts<
+  TData = Awaited<ReturnType<typeof listPrompts>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPrompts>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPromptsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new prompt
+ */
+export const getCreatePromptUrl = () => {
+  return `/api/prompts`;
+};
+
+export const createPrompt = async (
+  createPromptBody: CreatePromptBody,
+  options?: RequestInit,
+): Promise<Prompt> => {
+  return customFetch<Prompt>(getCreatePromptUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPromptBody),
+  });
+};
+
+export const getCreatePromptMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPrompt>>,
+    TError,
+    { data: BodyType<CreatePromptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPrompt>>,
+  TError,
+  { data: BodyType<CreatePromptBody> },
+  TContext
+> => {
+  const mutationKey = ["createPrompt"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPrompt>>,
+    { data: BodyType<CreatePromptBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPrompt(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePromptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPrompt>>
+>;
+export type CreatePromptMutationBody = BodyType<CreatePromptBody>;
+export type CreatePromptMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Create a new prompt
+ */
+export const useCreatePrompt = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPrompt>>,
+    TError,
+    { data: BodyType<CreatePromptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPrompt>>,
+  TError,
+  { data: BodyType<CreatePromptBody> },
+  TContext
+> => {
+  return useMutation(getCreatePromptMutationOptions(options));
+};
+
+/**
+ * Returns a single prompt and increments its view count
+ * @summary Get a single prompt
+ */
+export const getGetPromptUrl = (id: number) => {
+  return `/api/prompts/${id}`;
+};
+
+export const getPrompt = async (
+  id: number,
+  options?: RequestInit,
+): Promise<PromptDetail> => {
+  return customFetch<PromptDetail>(getGetPromptUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPromptQueryKey = (id: number) => {
+  return [`/api/prompts/${id}`] as const;
+};
+
+export const getGetPromptQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPrompt>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPrompt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPromptQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPrompt>>> = ({
+    signal,
+  }) => getPrompt(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getPrompt>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetPromptQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPrompt>>
+>;
+export type GetPromptQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get a single prompt
+ */
+
+export function useGetPrompt<
+  TData = Awaited<ReturnType<typeof getPrompt>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPrompt>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPromptQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns aggregate stats for the prompt library
+ * @summary Get library stats
+ */
+export const getGetPromptsStatsUrl = () => {
+  return `/api/prompts/stats`;
+};
+
+export const getPromptsStats = async (
+  options?: RequestInit,
+): Promise<PromptsStats> => {
+  return customFetch<PromptsStats>(getGetPromptsStatsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPromptsStatsQueryKey = () => {
+  return [`/api/prompts/stats`] as const;
+};
+
+export const getGetPromptsStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPromptsStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPromptsStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPromptsStatsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPromptsStats>>> = ({
+    signal,
+  }) => getPromptsStats({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPromptsStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPromptsStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPromptsStats>>
+>;
+export type GetPromptsStatsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get library stats
+ */
+
+export function useGetPromptsStats<
+  TData = Awaited<ReturnType<typeof getPromptsStats>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getPromptsStats>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPromptsStatsQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

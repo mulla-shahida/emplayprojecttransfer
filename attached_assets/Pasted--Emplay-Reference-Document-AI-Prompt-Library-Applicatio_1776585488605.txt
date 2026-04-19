@@ -1,0 +1,529 @@
+# Emplay Reference Document:  AI Prompt Library Application
+
+## Objective
+
+The goal of this project is to build a full-stack web application that helps users store and manage AI image generation prompts.
+In simple terms, this app acts like a small library where users can:
+
+- view saved prompts
+- add new prompts
+- open one prompt to see its full details
+- track how many times each prompt has been viewed
+
+This project solves a common problem: keeping AI prompts organized instead of storing them in random notes, chats, or documents. By the end, you should have a working application with:
+
+- an Angular frontend for the user interface
+- a Django backend for handling data and APIs
+- PostgreSQL for storing prompts permanently
+- Redis for storing the view count efficiently
+- Docker Compose to run everything together with one command
+
+The final outcome should be a beginner-friendly but properly structured full-stack application that follows the assignment requirements.
+
+## Technical Requirements
+
+### Required Technologies
+
+You are expected to use the following stack:
+
+- **Frontend:** Angular 14 or higher
+- **Backend:** Python with Django
+- **API style:** Standard Django views returning JSON
+- **Database:** PostgreSQL
+- **Cache / counter store:** Redis
+- **Containerization:** Docker + Docker Compose
+- **(Note: We strongly recommend to use Django + Angular, but if it's absolutely not feasible for you, you can use any framework from python or typescript (nodej.s) )**
+
+### Basic Environment Prerequisites
+
+Before starting, make sure your system has:
+
+- Python installed
+- Node.js and npm installed
+- Docker installed
+- Git installed
+- A code editor such as VS Code
+- Basic terminal/command line access
+
+## Step-by-Step Implementation Guide
+
+### 1. Planning
+
+Before coding, carefully read the requirements.
+You are being asked to build three main parts:
+
+- a backend to store and serve prompts
+- a frontend to display and create prompts
+- a Docker setup to run the complete app
+
+Your application needs:
+
+**Backend features**
+
+- store prompts in PostgreSQL
+- provide 3 endpoints:
+    - GET /prompts/
+    - POST /prompts/
+    - GET /prompts/:id/
+- increment Redis counter when a single prompt is viewed
+
+**Frontend features**
+
+- list all prompts
+- show details of one prompt
+- create a new prompt using a reactive form
+
+**DevOps features**
+
+- Dockerfile for frontend
+- Dockerfile for backend
+- docker-compose.yml for all services
+
+### 3. Create the backend project
+
+Start by creating a Django project and an app.
+
+Typical steps:
+
+- create a Django project, for example backend/
+- create an app, for example prompts/
+- configure PostgreSQL in settings
+- add the prompts app to INSTALLED_APPS
+
+### 4. Design the Prompt Model
+
+The assignment requires a Prompt model with:
+
+- id
+- title
+- content
+- complexity
+- created_at
+
+The model defines how your prompt data is stored in PostgreSQL.
+Things to keep in mind:
+
+- title should be a short text field
+- content should be a longer text field
+- complexity should be an integer
+- created_at should be automatically filled when the prompt is created
+- id can be either integer or UUID
+
+**Example model snippet**
+
+```
+from django.db import models
+
+class Prompt(models.Model):
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+    complexity = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+```
+
+**What to expect after this step:**
+
+- you run migrations
+- PostgreSQL gets a table for prompts
+- you can add test data from Django admin or shell if needed
+
+### 5. Add validation rules in the backend
+
+Although the frontend will validate input, backend validation is still important.
+ Frontend validation improves user experience, but backend validation protects your data. Someone could still send invalid API data directly.
+Examples of rules:
+
+- title should not be too short
+- content should not be too short
+- complexity must be between 1 and 10
+
+You can validate in forms, model clean methods, or inside the view logic. 
+
+For a beginner-friendly approach, validating inside request handling is acceptable if done carefully.
+**Expected result:** the backend rejects bad input with helpful error messages.
+
+### 6. Build the API endpoints in Django
+
+The assignment asks for REST-style endpoints, but you should build them using plain Django views, not DRF.
+You need:
+
+- **GET /prompts/**
+Returns all prompts. Used by the Angular list page.
+- **POST /prompts/**
+Creates a new prompt. Used by the Angular form page.
+- **GET /prompts//**
+Returns one prompt and increments its Redis view count. Used by the Angular detail page.
+
+A simple way  is to use function-based views or class-based views with JsonResponse.
+
+**Example endpoint snippet**
+
+```
+from django.http import JsonResponse
+from .models import Prompt
+
+def prompt_list(request):
+    if request.method == "GET":
+        prompts = Prompt.objects.all().values("id", "title", "complexity", "created_at")
+        return JsonResponse(list(prompts), safe=False)
+```
+
+**Expected result:**
+
+- visiting the endpoint returns JSON
+- Angular will later be able to consume it
+
+### 7. Connect Redis for the view counter
+
+This is one of the most important parts of the assignment.
+The rule is:
+
+- every time a prompt is retrieved via GET /prompts/:id/
+- increment the counter in Redis
+- return view_count in the response
+- Redis is the source of truth for view counts
+
+A common pattern is:
+
+- use a key like prompt::views
+- increment it with Redis INCR
+- read back the value
+- include it in the JSON response
+
+**Example snippet**
+
+```
+import redis
+
+r = redis.Redis(host="redis", port=6379, db=0)
+
+def get_prompt_views(prompt_id):
+    key = f"prompt:{prompt_id}:views"
+    return r.get(key)
+```
+
+And during detail retrieval:
+
+```
+key = f"prompt:{prompt.id}:views"
+view_count = r.incr(key)
+```
+
+**What to expect:**
+
+- every time the detail endpoint is called, the number goes up
+- PostgreSQL remains unchanged
+- the frontend sees live view count data
+
+### 8. Test backend endpoints before building the frontend
+
+Before working on Angular, make sure the backend works correctly.
+If APIs are broken, frontend debugging becomes confusing.
+Test all three endpoints using:
+
+- browser for GET requests
+- Postman, Insomnia, or curl for POST
+- repeated calls to detail endpoint to confirm Redis counter increments
+
+Check:
+
+- list endpoint returns all prompts
+- create endpoint stores a new prompt
+- detail endpoint returns prompt data plus updated view_count
+
+**Expected result:** backend is stable enough for frontend integration.
+
+### 9. Create the Angular frontend
+
+Now build the user interface.
+You will typically create:
+
+- an Angular project inside frontend/
+- routing for navigation
+- components for: prompt list, prompt detail, add prompt form
+- a service for API calls
+
+**Expected result:** Angular app starts successfully and can be opened in the browser.
+
+### 10. Set up Angular routing
+
+The frontend should support navigation between pages.
+A simple route structure could be:
+
+- /prompts → list view
+- /prompts/:id → detail view
+- /add-prompt → create form
+
+Why this is needed: routing makes the app feel like a real frontend application with separate pages.
+**Expected result:** clicking links changes views without reloading the whole app.
+
+### 11. Create an API service in Angular
+
+Instead of calling APIs directly inside every component, create one shared service.
+Why this is needed:
+
+- keeps components cleaner
+- avoids repeated code
+- makes API logic easier to update later
+
+Typical responsibilities of the service:
+
+- fetch all prompts
+- fetch one prompt by ID
+- create a new prompt
+
+**Example service snippet**
+
+```
+getPrompts() {
+  return this.http.get<any[]>('/api/prompts/');
+}
+
+getPrompt(id: string) {
+  return this.http.get<any>(`/api/prompts/${id}/`);
+}
+
+createPrompt(data: any) {
+  return this.http.post('/api/prompts/', data);
+}
+```
+
+**Expected result:** components can call one service instead of manually handling URLs everywhere.
+
+### 12. Build the Prompt List View
+
+This page should fetch all prompts and display: title and complexity.
+A good beginner-friendly interface might show:
+
+- prompt title as main text
+- complexity as a colored badge
+- a button or link to open the detail page
+
+You can visually indicate complexity using CSS classes such as:
+
+- low complexity → green
+- medium complexity → orange
+- high complexity → red
+
+**Expected result:** user can open the app and immediately see all saved prompts.
+
+### 13. Build the Prompt Detail View
+
+This page should:
+
+- read the prompt ID from the route
+- call the detail API
+- display full prompt content
+- display the live view_count
+
+This is where the Redis integration becomes visible to the user.
+Each time this page loads, the backend endpoint is called, so the view count increases automatically.
+**Expected result:** opening the same prompt multiple times shows the count increasing.
+
+### 14. Build the Add Prompt Form using Reactive Forms
+
+The assignment specifically asks for a reactive form.
+Reactive forms are the recommended Angular approach for structured validation and form control.
+Your form should include: title, content, and complexity.
+
+Validation rules:
+
+- title minimum 3 characters
+- content minimum 20 characters
+- complexity between 1 and 10
+
+**Example form setup snippet**
+
+```
+this.promptForm = this.fb.group({
+  title: ['', [Validators.required, Validators.minLength(3)]],
+  content: ['', [Validators.required, Validators.minLength(20)]],
+  complexity: [1, [Validators.required, Validators.min(1), Validators.max(10)]]
+});
+```
+
+**Expected result:**
+
+- invalid form shows error messages
+- valid form submits successfully
+- new prompt appears in the list
+
+### 15. Display clear validation messages
+
+Do not just block submission silently.
+Examples:
+
+- “Title must be at least 3 characters.”
+- “Content must be at least 20 characters.”
+- “Complexity must be between 1 and 10.”
+
+**Expected result:** users understand how to fix their input.
+
+### 16. Connect frontend and backend
+
+Once both sides are ready, connect Angular to Django.
+There are two common approaches:
+
+- direct requests to backend URL
+- Angular dev proxy during local development
+
+A proxy is often easier in development because it avoids CORS issues.
+**Expected result:**
+
+- list page fetches backend data
+- form submits to backend
+- detail page shows live prompt data
+
+### 17. Add Docker support for the backend
+
+Create a Dockerfile for Django.
+Your backend container usually needs:
+
+- Python base image
+- dependency installation
+- project copy
+- migration/start command
+
+**Expected result:** backend can run inside a container instead of depending on local machine setup.
+
+### 18. Add Docker support for the frontend
+
+Create a Dockerfile for Angular.
+Depending on your approach, you may:
+
+- run Angular dev server in a container for simplicity
+- or build Angular and serve static files using Nginx
+
+For an assignment, either is usually acceptable unless production optimization is required.
+**Expected result:** Angular starts inside a container and is accessible through a browser port.
+
+### 19. Create the docker-compose.yml file
+
+This file is the glue that connects everything.
+It should define services for: frontend, backend, postgres, redis.
+Rthe assignment requires the full stack to run with one command:
+`docker-compose up --build`
+
+Important responsibilities of Compose:
+
+- create shared network
+- provide environment variables
+- expose ports
+- ensure containers can talk to each other
+
+**Expected result:** one command starts the complete system.
+
+**Example compose idea**
+
+```
+services:
+  db:
+    image: postgres:14
+  redis:
+    image: redis:7
+  backend:
+    build: ./backend
+  frontend:
+    build: ./frontend
+```
+
+This is only a simplified example, not a full config.
+
+### 20. Handle database migrations and startup flow
+
+A common beginner issue is forgetting migrations inside Docker.
+Why this is needed: the app cannot work until PostgreSQL has the correct tables.
+Your backend startup process should make sure:
+
+- database is reachable
+- migrations are applied
+- server starts after that
+
+**Expected result:** when Docker Compose runs, the database is ready and Django works without manual repair steps.
+
+### 21. Test the full application end to end
+
+Now test everything together.
+Checklist:
+
+- open frontend in browser
+- list page loads prompts
+- add a new prompt
+- open detail page
+- refresh detail page and confirm view_count increases
+- restart containers and confirm prompt data remains in PostgreSQL
+- confirm Redis counter works while service is running
+
+**Expected result:** full assignment requirements are working as one system.
+
+### 22. Optional bonus features
+
+If you have time, you can add bonuses.
+
+**Bonus A: Authentication**
+Allow only logged-in users to create prompts. Session-based authentication may be simpler for beginners.
+
+**Bonus B: Tagging system**
+Categorize prompts (anime, fantasy, sci-fi). Involves creating a Tag model and Many-to-Many relations.
+
+**Bonus C: Deployment**
+Make the app publicly accessible. Strong addition if completed cleanly.
+
+### 23. Prepare the README
+
+Your README is part of the submission and should be treated seriously.
+It should include:
+
+- project overview
+- tech stack
+- setup steps
+- how to run with Docker Compose
+- API endpoints
+- architectural explanation
+- any assumptions or trade-offs
+- bonus features completed
+
+Reviewers should understand how to run and evaluate your project quickly.
+**Expected result:** someone can clone the repo and run your app without confusion.
+
+## Project Structure
+
+Below is an example of a clean beginner-friendly structure.
+
+```
+ai-prompt-library/
+│
+├── backend/
+│   ├── config/
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── prompts/
+│   │   ├── models.py
+│   │   ├── views.py
+│   │   ├── urls.py
+│   │   ├── migrations/
+│   │   └── admin.py
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── manage.py
+│
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── components/
+│   │   │   │   ├── prompt-list/
+│   │   │   │   ├── prompt-detail/
+│   │   │   │   └── add-prompt/
+│   │   │   ├── services/
+│   │   │   │   └── prompt.service.ts
+│   │   │   ├── app-routing.module.ts
+│   │   │   └── app.module.ts
+│   │   └── ...
+│   ├── package.json
+│   └── Dockerfile
+│
+├── docker-compose.yml
+├── .env
+└── README.md
+```

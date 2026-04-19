@@ -14,3 +14,63 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns all prompts ordered by creation date descending
+ * @summary List all prompts
+ */
+export const ListPromptsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  complexity: zod.number(),
+  createdAt: zod.coerce.date(),
+});
+export const ListPromptsResponse = zod.array(ListPromptsResponseItem);
+
+/**
+ * @summary Create a new prompt
+ */
+export const createPromptBodyTitleMin = 3;
+
+export const createPromptBodyContentMin = 20;
+
+export const createPromptBodyComplexityMax = 10;
+
+export const CreatePromptBody = zod.object({
+  title: zod.string().min(createPromptBodyTitleMin),
+  content: zod.string().min(createPromptBodyContentMin),
+  complexity: zod.number().min(1).max(createPromptBodyComplexityMax),
+});
+
+/**
+ * Returns a single prompt and increments its view count
+ * @summary Get a single prompt
+ */
+export const GetPromptParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPromptResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  content: zod.string(),
+  complexity: zod.number(),
+  createdAt: zod.coerce.date(),
+  viewCount: zod.number(),
+});
+
+/**
+ * Returns aggregate stats for the prompt library
+ * @summary Get library stats
+ */
+export const GetPromptsStatsResponse = zod.object({
+  total: zod.number(),
+  avgComplexity: zod.number(),
+  complexityBreakdown: zod.array(
+    zod.object({
+      level: zod.string(),
+      count: zod.number(),
+    }),
+  ),
+  recentCount: zod.number(),
+});
